@@ -2444,6 +2444,17 @@ function parseSequenceRef(
 }
 
 function parseField(text: string): SimpleFieldId | null {
+  // When the diamond is downstream of a known trigger (Product / Quote
+  // / Pipeline / Appointment), we MUST NOT silently map typed input to
+  // Deal fields — that's how phrases like "won" or "scheduled" leak in
+  // as `dealStage = Won` for an Appointment-scoped diamond. The
+  // dedicated trigger-keyword parser doesn't exist yet, so for now we
+  // return null and let the assistant ask the user to use a pill or
+  // the dropdowns. Pills, recipes, and templates are all trigger-aware
+  // already, so the user still has multiple working entry points.
+  if (props.triggerSlug && isKnownTriggerSlug(props.triggerSlug)) {
+    return null;
+  }
   const lower = text.toLowerCase();
   for (const entry of FIELD_KEYWORDS) {
     if (entry.keywords.some((k) => lower.includes(k))) return entry.field;
