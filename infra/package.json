@@ -1,0 +1,19 @@
+{
+  "name": "pebble-ai-chat-lambda",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWS Lambda proxy between the Pebble Vue app and the Anthropic Messages API.",
+  "scripts": {
+    "build": "esbuild ai-chat-lambda.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --format=cjs --external:aws-lambda",
+    "package": "npm run build && cd dist && zip -r ../lambda.zip .",
+    "deploy": "npm run package && aws lambda update-function-code --function-name pebble-ai-chat --zip-file fileb://lambda.zip"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.140",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}
