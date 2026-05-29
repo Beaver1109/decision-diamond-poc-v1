@@ -1514,7 +1514,11 @@ function daysFromNowIso(days: number) {
 type ConditionRecipe = {
   id: string;
   label: string;
-  field: SimpleFieldId;
+  /** Generic string so trigger-scoped fields (e.g. `appointment.event`,
+   *  `pipeline.stage`) can flow through the same recipe pipeline as
+   *  legacy Deal fields. The editor's renderers already resolve any
+   *  field id via the schema lookups in `triggerAttributes.ts`. */
+  field: string;
   operator: string;
   values: string[];
 };
@@ -1564,10 +1568,54 @@ const CONDITION_RECIPES: ConditionRecipe[] = [
   },
 ];
 
-/** Pick up to 3 recipes whose field isn't already used by the sequence. */
+/** Pick up to 3 recipes whose field isn't already used by the sequence.
+ *  Trigger-aware: when the diamond is downstream of one of the four
+ *  supported triggers (Product / Quote / Pipeline / Appointment), the
+ *  recipe pool is sourced from that trigger's `TRIGGER_SMART_PILLS` so
+ *  the assistant never offers a Deal field for an Appointment-scoped
+ *  diamond. Falls back to the legacy Deal recipes when no trigger is
+ *  upstream. */
 function recipesForSequence(gi: number): ConditionRecipe[] {
   const used = collectFieldsInUse(props.config.groups[gi]);
-  return CONDITION_RECIPES.filter((r) => !used.has(r.field)).slice(0, 3);
+  let pool: ConditionRecipe[];
+  if (props.triggerSlug && isKnownTriggerSlug(props.triggerSlug)) {
+    pool = TRIGGER_SMART_PILLS[props.triggerSlug].map((p) => ({
+      id: `${p.field}-${p.values.join('-')}`,
+      label: p.label,
+      field: p.field,
+      operator: p.operator,
+      values: [...p.values],
+    }));
+  } else {
+    pool = CONDITION_RECIPES;
+  }
+  // Legacy Deal pool has unique fields per recipe, so a field-only
+  // filter is correct. Trigger pools may reuse a field across multiple
+  // value variants (e.g. `Appointment event = Schedules` and
+  // `Appointment event = Cancels`), so they need the broader
+  // field-only filter to NOT suppress sibling values — only filter out
+  // the exact (field, values) pair that's already configured. We track
+  // both keys.
+  const usedFieldsAndValues = new Set<string>();
+  const group = props.config.groups[gi];
+  if (group) {
+    for (const b of group.blocks) {
+      for (const c of b.conditions) {
+        if (c.field) {
+          usedFieldsAndValues.add(`${c.field}::${JSON.stringify(c.values)}`);
+        }
+      }
+    }
+  }
+  return pool
+    .filter((r) => {
+      const exactKey = `${r.field}::${JSON.stringify(r.values)}`;
+      if (usedFieldsAndValues.has(exactKey)) return false;
+      // Legacy Deal pool: also suppress whole field if already used.
+      if (pool === CONDITION_RECIPES && used.has(r.field)) return false;
+      return true;
+    })
+    .slice(0, 3);
 }
 
 // ===================================================================
