@@ -42,6 +42,10 @@ export interface TriggerSuggestionRule {
   field: string;
   operator: string;
   values: string[];
+  /** Additional AND-conditions placed in the SAME block as the primary
+   *  condition above. Used by pipeline / product templates that need
+   *  e.g. `Direction equals Into AND Stage equals Quote accepted`. */
+  additional?: Array<{ field: string; operator: string; values: string[] }>;
 }
 
 export interface TriggerSuggestion {
@@ -67,14 +71,14 @@ export interface TriggerSmartPill {
 const PRODUCT_SUGGESTIONS: TriggerSuggestion[] = [
   {
     id: 'productCardChargeVsOther',
-    title: 'Card-charged vs other payment',
+    title: 'Card-charged vs manual payment',
     category: 'Payment type',
     description:
-      'Route credit-card-charged orders into the standard delivery flow and flag other tenders for manual review.',
+      'Route credit-card-charged orders into the standard delivery flow and flag manual tenders for owner review.',
     message: {
-      title: 'Card-charged vs other payment',
-      lead: 'Split incoming purchases by payment type so card-charged orders ship immediately while manual / check / cash purchases go to a human-review path.',
-      whenTitle: 'When a purchase is made',
+      title: 'Card-charged vs manual payment',
+      lead: 'Split incoming purchases by payment type so card-charged orders ship immediately while Check / Cash / Money Order purchases go to a human-review path.',
+      whenTitle: 'When a product is purchased',
       whenBody:
         'This starts the automation any time a purchase is recorded, then evaluates how the customer paid.',
       thenSteps: [
@@ -86,9 +90,9 @@ const PRODUCT_SUGGESTIONS: TriggerSuggestion[] = [
             'Automated receipt + fulfillment hand-off + post-purchase onboarding.',
         },
         {
-          title: 'Manual / cash / check branch',
+          title: 'Manual-payment branch',
           decision:
-            'If Payment type equals Cash (or Check, Money Order, Adjustment) → Sequence 2.',
+            'If Payment type equals Check → Sequence 2.',
           suggestedNext:
             'Notify the owner to confirm payment, then continue onboarding after confirmation.',
         },
@@ -105,27 +109,27 @@ const PRODUCT_SUGGESTIONS: TriggerSuggestion[] = [
         sequenceIndex: 1,
         field: 'product.paymentType',
         operator: 'equals',
-        values: ['Cash'],
+        values: ['Check'],
       },
     ],
   },
   {
-    id: 'productSpecificVsAny',
-    title: 'Specific-product vs any purchase',
+    id: 'productSignatureVsAny',
+    title: 'Signature product vs any other purchase',
     category: 'Purchase type',
     description:
-      'Branch high-margin / signature products into a premium track; everything else into the default flow.',
+      'Branch a specific high-margin product (e.g. Expensive Product) into a premium track; everything else into the default flow.',
     message: {
-      title: 'Specific-product vs any purchase',
-      lead: 'Route purchases of your signature product into a premium onboarding while any other purchase rides the default path.',
-      whenTitle: 'When a purchase is made',
+      title: 'Signature product vs any other purchase',
+      lead: 'Route purchases of a specific signature product into a premium onboarding while any other purchase rides the default path.',
+      whenTitle: 'When a product is purchased',
       whenBody:
-        'Fires on any purchase, then checks whether the order matches your signature product.',
+        'Fires on any purchase, then checks both the purchase type and which specific product was bought.',
       thenSteps: [
         {
           title: 'Signature product branch',
           decision:
-            'If Purchase type equals Product → Sequence 1.',
+            'If Purchase type equals Product AND Products equals Expensive Product → Sequence 1.',
           suggestedNext:
             'Personal welcome from a senior account manager + premium onboarding cadence.',
         },
@@ -144,6 +148,13 @@ const PRODUCT_SUGGESTIONS: TriggerSuggestion[] = [
         field: 'product.purchaseType',
         operator: 'equals',
         values: ['Product'],
+        additional: [
+          {
+            field: 'product.products',
+            operator: 'equals',
+            values: ['Expensive Product'],
+          },
+        ],
       },
       {
         sequenceIndex: 1,
@@ -304,26 +315,26 @@ const QUOTE_SMART_PILLS: TriggerSmartPill[] = [
 
 const PIPELINE_SUGGESTIONS: TriggerSuggestion[] = [
   {
-    id: 'pipelineWonVsLost',
-    title: 'Won vs Lost handling',
+    id: 'pipelineAcceptedVsNegotiating',
+    title: 'Quote accepted vs still negotiating',
     category: 'Pipeline stage',
     description:
-      'Celebrate won deals on a fulfillment path; recover lost ones with a re-engagement sequence.',
+      'Celebrate deals that move INTO Quote accepted; nudge deals that stalled in Negotiating with a recovery cadence.',
     message: {
-      title: 'Won vs Lost handling',
-      lead: 'Cleanly fork the flow on whether the deal reached Won or Lost so each outcome triggers the right downstream actions.',
+      title: 'Quote accepted vs still negotiating',
+      lead: 'Fork on whether the deal landed in Quote accepted or got stuck in Negotiating, so each outcome triggers the right downstream actions.',
       whenTitle: 'When a deal moves between pipeline stages',
       whenBody:
-        'Fires every time a deal advances to a new pipeline stage; the diamond looks at the resulting stage.',
+        'Fires every time a deal advances to a new pipeline stage; the diamond inspects the direction of the move and the resulting stage.',
       thenSteps: [
         {
-          title: 'Won branch',
+          title: 'Quote-accepted branch',
           decision: 'If Direction equals Into AND Stage equals Quote accepted → Sequence 1.',
           suggestedNext:
             'Send the success email, kick off fulfillment, request a review at day 7.',
         },
         {
-          title: 'Lost branch',
+          title: 'Still-negotiating branch',
           decision: 'If Direction equals Into AND Stage equals Negotiating → Sequence 2.',
           suggestedNext:
             'Trigger a recovery cadence + assign the deal owner a callback task.',
@@ -336,26 +347,41 @@ const PIPELINE_SUGGESTIONS: TriggerSuggestion[] = [
         field: 'pipeline.direction',
         operator: 'equals',
         values: ['Into'],
+        additional: [
+          {
+            field: 'pipeline.stage',
+            operator: 'equals',
+            values: ['Quote accepted'],
+          },
+        ],
       },
       {
         sequenceIndex: 1,
-        field: 'pipeline.stage',
+        field: 'pipeline.direction',
         operator: 'equals',
-        values: ['Negotiating'],
+        values: ['Into'],
+        additional: [
+          {
+            field: 'pipeline.stage',
+            operator: 'equals',
+            values: ['Negotiating'],
+          },
+        ],
       },
     ],
   },
   {
     id: 'pipelineQualifiedRouting',
-    title: 'Qualified vs unqualified routing',
+    title: 'Qualified vs new leads routing',
     category: 'Pipeline stage',
     description:
-      'Send qualified leads to a discovery cadence; leave unqualified leads in nurture.',
+      'Send deals moving INTO Qualified leads to a discovery cadence; deals entering New leads start in nurture.',
     message: {
-      title: 'Qualified vs unqualified routing',
-      lead: 'Pick the right cadence for newly qualified deals versus everyone still in the top of funnel.',
+      title: 'Qualified vs new leads routing',
+      lead: 'Pick the right cadence for newly qualified deals versus everyone still at the top of funnel — both branches require Direction equals Into so we react only to forward movement.',
       whenTitle: 'When a deal moves between pipeline stages',
-      whenBody: 'Fires whenever a deal\'s stage changes.',
+      whenBody:
+        'Fires whenever a deal\'s stage changes. The diamond checks the direction so we only react to forward progression.',
       thenSteps: [
         {
           title: 'Qualified branch',
@@ -364,8 +390,8 @@ const PIPELINE_SUGGESTIONS: TriggerSuggestion[] = [
             'Owner-assigned discovery call + tailored case study email.',
         },
         {
-          title: 'New / unqualified branch',
-          decision: 'If Stage equals New leads → Sequence 2.',
+          title: 'New leads branch',
+          decision: 'If Direction equals Into AND Stage equals New leads → Sequence 2.',
           suggestedNext: 'Educational nurture sequence + scoring updates.',
         },
       ],
@@ -373,15 +399,29 @@ const PIPELINE_SUGGESTIONS: TriggerSuggestion[] = [
     rules: [
       {
         sequenceIndex: 0,
-        field: 'pipeline.stage',
+        field: 'pipeline.direction',
         operator: 'equals',
-        values: ['Qualified leads'],
+        values: ['Into'],
+        additional: [
+          {
+            field: 'pipeline.stage',
+            operator: 'equals',
+            values: ['Qualified leads'],
+          },
+        ],
       },
       {
         sequenceIndex: 1,
-        field: 'pipeline.stage',
+        field: 'pipeline.direction',
         operator: 'equals',
-        values: ['New leads'],
+        values: ['Into'],
+        additional: [
+          {
+            field: 'pipeline.stage',
+            operator: 'equals',
+            values: ['New leads'],
+          },
+        ],
       },
     ],
   },
@@ -468,27 +508,30 @@ const APPOINTMENT_SUGGESTIONS: TriggerSuggestion[] = [
     ],
   },
   {
-    id: 'appointmentNewVsCancel',
-    title: 'New booking vs cancellation',
-    category: 'Appointment event',
+    id: 'appointmentInitialConsultVsOther',
+    title: 'Initial consult booked vs other appointment',
+    category: 'Appointment type',
     description:
-      'Send fresh bookings to confirmation; route cancellations to a recovery sequence.',
+      'Treat newly-booked initial consultations differently from any other appointment booking.',
     message: {
-      title: 'New booking vs cancellation',
-      lead: 'Focus on the two highest-value outcomes — booked or cancelled — and let reschedules fall through to a quiet update.',
-      whenTitle: 'When a contact changes their appointment',
-      whenBody: 'Triggers on every appointment event.',
+      title: 'Initial consult booked vs other appointment',
+      lead: 'Newly-booked initial consultations get a discovery-focused cadence; other appointment types ride the standard confirmation flow.',
+      whenTitle: 'When a contact schedules an appointment',
+      whenBody:
+        'Triggers on every Schedules event and inspects which appointment type was booked.',
       thenSteps: [
         {
-          title: 'New booking branch',
-          decision: 'If Appointment event equals Schedules → Sequence 1.',
-          suggestedNext: 'Send the confirmation cadence.',
+          title: 'Initial consult branch',
+          decision:
+            'If Appointment event equals Schedules AND Appointment type equals 15-Minute Initial Consultation with Jialing Chen (15 minutes) → Sequence 1.',
+          suggestedNext:
+            'Discovery questionnaire + prep email + 24-hour reminder + post-call follow-up task.',
         },
         {
-          title: 'Cancellation branch',
-          decision: 'If Appointment event equals Cancels → Sequence 2.',
-          suggestedNext:
-            'Re-book offer + feedback survey + reduce reminder volume.',
+          title: 'Other appointment branch',
+          decision:
+            'If Appointment event equals Schedules → Sequence 2.',
+          suggestedNext: 'Standard confirmation + calendar invite + reminder.',
         },
       ],
     },
@@ -498,12 +541,21 @@ const APPOINTMENT_SUGGESTIONS: TriggerSuggestion[] = [
         field: 'appointment.event',
         operator: 'equals',
         values: ['Schedules'],
+        additional: [
+          {
+            field: 'appointment.type',
+            operator: 'equals',
+            values: [
+              '15-Minute Initial Consultation with Jialing Chen (15 minutes)',
+            ],
+          },
+        ],
       },
       {
         sequenceIndex: 1,
         field: 'appointment.event',
         operator: 'equals',
-        values: ['Cancels'],
+        values: ['Schedules'],
       },
     ],
   },

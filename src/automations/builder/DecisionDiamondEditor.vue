@@ -1620,19 +1620,36 @@ function applySuggestion(
       for (const r of s.rules) {
         const group = next.groups[r.sequenceIndex];
         if (!group) continue;
+        const conditions = [
+          {
+            id: uid('c'),
+            subject: '',
+            category: '',
+            field: r.field,
+            operator: r.operator,
+            values: [...r.values],
+          },
+        ];
+        // Trigger-aware suggestions may carry extra AND-conditions in
+        // `additional` (e.g. `Direction equals Into AND Stage equals X`).
+        // Legacy SUGGESTIONS don't use this field — undefined is fine.
+        const extra = (r as { additional?: Array<{ field: string; operator: string; values: string[] }> }).additional;
+        if (extra && extra.length > 0) {
+          for (const a of extra) {
+            conditions.push({
+              id: uid('c'),
+              subject: '',
+              category: '',
+              field: a.field,
+              operator: a.operator,
+              values: [...a.values],
+            });
+          }
+        }
         group.blocks = [
           {
             id: uid('b'),
-            conditions: [
-              {
-                id: uid('c'),
-                subject: '',
-                category: '',
-                field: r.field,
-                operator: r.operator,
-                values: [...r.values],
-              },
-            ],
+            conditions,
           },
         ];
       }
