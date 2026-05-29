@@ -1,0 +1,1 @@
+import{o as c,c as l,a as e}from"./index-CkF6UK_i.js";var t={xmlns:"http://www.w3.org/2000/svg",width:"24",height:"24"};function n(o,r){return c(),l("svg",t,r[0]||(r[0]=[e("circle",{cx:"5",cy:"12",r:"2"},null,-1),e("circle",{cx:"12",cy:"12",r:"2"},null,-1),e("circle",{cx:"19",cy:"12",r:"2"},null,-1)]))}var i={render:n};export{i as default,n as render};

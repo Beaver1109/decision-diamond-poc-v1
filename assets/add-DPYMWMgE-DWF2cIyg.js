@@ -1,0 +1,1 @@
+import{o as r,c as a,a as t}from"./index-CkF6UK_i.js";var o={xmlns:"http://www.w3.org/2000/svg",width:"24",height:"24"};function l(n,e){return r(),a("svg",o,e[0]||(e[0]=[t("path",{"fill-rule":"evenodd",d:"M13 5a1 1 0 1 0-2 0v6H5a1 1 0 1 0 0 2h6v6a1 1 0 1 0 2 0v-6h6a1 1 0 1 0 0-2h-6z"},null,-1)]))}var d={render:l};export{d as default,l as render};
