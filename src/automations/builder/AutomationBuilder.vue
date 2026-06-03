@@ -128,7 +128,7 @@
             <span class="builder__sidebar-item-icon" v-html="item.svg" />
             <span class="builder__sidebar-item-label">{{ item.title }}</span>
             <span
-              v-if="item.slug === 'landing-page-is-submitted'"
+              v-if="NEW_TRIGGER_SLUGS.has(item.slug)"
               class="builder__sidebar-item-new"
             >New</span>
           </li>
@@ -1335,6 +1335,17 @@ const savedAt = computed(() => {
 const sidebarCollapsed = ref(false);
 const sidebarTab = ref<'when' | 'then'>('when');
 const sidebarQuery = ref('');
+
+/** Sidebar trigger slugs that get the green "New" chip. These are the
+ *  four CRM triggers the decision-diamond editor is entity-aware for
+ *  (per DECISION-DIAMOND-LOGIC.md §4). The previously-labeled
+ *  `landing-page-is-submitted` no longer wears the chip. */
+const NEW_TRIGGER_SLUGS = new Set([
+  'product-is-purchased',
+  'quote-status',
+  'pipeline-stage-is-moved',
+  'appointments',
+]);
 
 const filteredSidebarItems = computed(() => {
   const items = sidebarTab.value === 'when' ? whenItems : thenItems;
