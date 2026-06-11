@@ -107,6 +107,10 @@ const props = defineProps<{
   items: IconItem[];
   whenItems?: IconItem[];
   thenItems?: IconItem[];
+  /** Hide the featured "Decision diamond" row. Used by the empty-state
+   *  Starting-point picker since a diamond can't be the first node — it
+   *  always needs an upstream trigger. */
+  hideDecisionDiamond?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -246,6 +250,7 @@ const filteredWhen = computed(() => filterList(props.whenItems));
 const filteredThen = computed(() => filterList(props.thenItems));
 
 const ddVisible = computed(() => {
+  if (props.hideDecisionDiamond) return false;
   const q = query.value.trim().toLowerCase();
   if (!q) return true;
   return q.includes('decision') || q.includes('diamond') || q.includes('branch');

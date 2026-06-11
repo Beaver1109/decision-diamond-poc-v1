@@ -483,7 +483,7 @@
         <button
           type="button"
           class="builder__starting-point"
-          @click="seedStartingPoint"
+          @click.stop="openStartingPointPicker"
         >
           <span class="builder__starting-plus" aria-hidden="true">+</span>
           <span class="builder__starting-text">
@@ -570,7 +570,8 @@
       :anchor-btn="picker.anchorBtn"
       :items="picker.type === 'when' ? whenItems : thenItems"
       :when-items="whenItems"
-      :then-items="thenItems"
+      :then-items="picker.originId === STARTING_POINT_SENTINEL ? [] : thenItems"
+      :hide-decision-diamond="picker.originId === STARTING_POINT_SENTINEL"
       @pick="onPickIcon"
       @pick-when="onPickWhen"
       @pick-then="onPickThen"
@@ -1450,15 +1451,41 @@ function onSidebarItemClick(item: IconItem) {
   }
 }
 
-/** Seed an initial "Starting point" trigger so the canvas leaves the
- *  empty state. Used by the dashed starting-point card. */
-function seedStartingPoint() {
+/** Sentinel originId used by the empty-state Starting-point picker so
+ *  the pick handler knows to seed the FIRST node from scratch instead
+ *  of routing through `insertAfter` (which requires an existing
+ *  origin). */
+const STARTING_POINT_SENTINEL = '__starting-point__';
+
+/** Open the InlineAddPicker anchored below the empty-state Starting
+ *  point button. The picker is restricted to `when` items (triggers)
+ *  since a starting point must be a trigger; picking one becomes the
+ *  first node on the canvas. */
+function openStartingPointPicker(ev: MouseEvent) {
+  const btnRect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
+  const sx = window.scrollX || 0;
+  const sy = window.scrollY || 0;
+  picker.value = {
+    originId: STARTING_POINT_SENTINEL,
+    type: 'when',
+    anchor: { x: btnRect.left + sx, y: btnRect.bottom + 4 + sy },
+    anchorBtn: {
+      left: btnRect.left + sx,
+      right: btnRect.right + sx,
+      bottom: btnRect.bottom + 4 + sy,
+    },
+  };
+}
+
+/** Seed the first trigger node when the user picks from the
+ *  starting-point dropdown. Position matches the legacy
+ *  seedStartingPoint default so the rest of the canvas math stays put. */
+function seedFirstNode(payload: { name: string; title: string }) {
   nodes.value.push({
     id: uid('n'),
     type: 'trigger',
-    title: 'Starting point',
-    subtitle: 'A contact is added when…',
-    name: 'starting-point',
+    title: payload.title,
+    name: payload.name,
     x: 80,
     y: 240,
   });
@@ -2379,8 +2406,10 @@ function openInlinePicker(
 
 function onPickIcon(item: IconItem) {
   if (!picker.value) return;
-  // Locked-pair shortcut for Get email opt-in (per HANDOFF §10)
-  if (item.slug === 'get-email-opt-in') {
+  if (picker.value.originId === STARTING_POINT_SENTINEL) {
+    seedFirstNode({ name: item.slug, title: item.title });
+  } else if (item.slug === 'get-email-opt-in') {
+    // Locked-pair shortcut for Get email opt-in (per HANDOFF §10)
     insertGetEmailOptInLockedPair(picker.value.originId, item);
   } else {
     insertAfter(picker.value.originId, {
@@ -2394,11 +2423,15 @@ function onPickIcon(item: IconItem) {
 
 function onPickWhen(item: IconItem) {
   if (!picker.value) return;
-  insertAfter(picker.value.originId, {
-    type: 'trigger',
-    name: item.slug,
-    title: item.title,
-  });
+  if (picker.value.originId === STARTING_POINT_SENTINEL) {
+    seedFirstNode({ name: item.slug, title: item.title });
+  } else {
+    insertAfter(picker.value.originId, {
+      type: 'trigger',
+      name: item.slug,
+      title: item.title,
+    });
+  }
   picker.value = null;
 }
 

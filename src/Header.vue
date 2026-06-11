@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watchEffect, onMounted, onUnmounted } from 'vue';
+import { ref, watchEffect } from 'vue';
 import {
   DexButton,
   DexInline,
@@ -12,62 +12,21 @@ defineOptions({
   name: 'DexHeader',
 });
 
-function useMatchMedia(query: string) {
-  const matches = ref(false);
-  let mediaQuery: MediaQueryList | null = null;
-  let handler: ((event: MediaQueryListEvent) => void) | null = null;
-
-  onMounted(() => {
-    mediaQuery = window.matchMedia(query);
-    matches.value = mediaQuery.matches;
-
-    handler = (event: MediaQueryListEvent) => {
-      matches.value = event.matches;
-    };
-
-    mediaQuery.addEventListener('change', handler);
-  });
-
-  onUnmounted(() => {
-    if (mediaQuery && handler) {
-      mediaQuery.removeEventListener('change', handler);
-    }
-  });
-
-  return matches;
-}
-
-const theme = ref(
-  localStorage.getItem('dex-theme') || document.body.dataset.theme || 'keap',
-);
-
-const colorScheme = ref(
-  localStorage.getItem('dex-color-scheme') ||
-    document.body.dataset.colorScheme ||
-    'system',
-);
-
-const isPrefersDarkMode = useMatchMedia('(prefers-color-scheme: dark)');
+// Theme is locked to light variants for the POC — Dark / System are
+// disabled to avoid the half-themed states some DEX components still
+// have. Default is Whisker Light.
+const theme = ref<'maverick' | 'keap'>('maverick');
+const colorScheme = 'light' as const;
 
 watchEffect(() => {
   document.body.dataset.theme = theme.value;
+  document.body.dataset.colorScheme = colorScheme;
   localStorage.setItem('dex-theme', theme.value);
+  localStorage.setItem('dex-color-scheme', colorScheme);
 });
 
-watchEffect(() => {
-  localStorage.setItem('dex-color-scheme', colorScheme.value);
-  if (colorScheme.value === 'system') {
-    document.body.dataset.colorScheme = isPrefersDarkMode.value
-      ? 'dark'
-      : 'light';
-  } else {
-    document.body.dataset.colorScheme = colorScheme.value;
-  }
-});
-
-function setThemeAndColorScheme(newTheme: string, newColorScheme: string) {
+function setTheme(newTheme: 'maverick' | 'keap') {
   theme.value = newTheme;
-  colorScheme.value = newColorScheme;
 }
 </script>
 
@@ -115,33 +74,11 @@ function setThemeAndColorScheme(newTheme: string, newColorScheme: string) {
           <DexButton variant="outline">Theme</DexButton>
         </template>
         <template #content>
-          <DexDropdownMenuItem
-            @select="setThemeAndColorScheme('keap', 'light')"
-          >
-            Pebble Light
-          </DexDropdownMenuItem>
-          <DexDropdownMenuItem @select="setThemeAndColorScheme('keap', 'dark')">
-            Pebble Dark
-          </DexDropdownMenuItem>
-          <DexDropdownMenuItem
-            @select="setThemeAndColorScheme('keap', 'system')"
-          >
-            Pebble System
-          </DexDropdownMenuItem>
-          <DexDropdownMenuItem
-            @select="setThemeAndColorScheme('maverick', 'light')"
-          >
+          <DexDropdownMenuItem @select="setTheme('maverick')">
             Whisker Light
           </DexDropdownMenuItem>
-          <DexDropdownMenuItem
-            @select="setThemeAndColorScheme('maverick', 'dark')"
-          >
-            Whisker Dark
-          </DexDropdownMenuItem>
-          <DexDropdownMenuItem
-            @select="setThemeAndColorScheme('maverick', 'system')"
-          >
-            Whisker System
+          <DexDropdownMenuItem @select="setTheme('keap')">
+            Pebble Light
           </DexDropdownMenuItem>
         </template>
       </DexDropdownMenu>

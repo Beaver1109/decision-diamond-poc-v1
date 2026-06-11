@@ -8,10 +8,15 @@
   <title>my-dex-prototype</title>
 </head>
 
-<body data-theme="keap" data-color-scheme="light">
+<body data-theme="maverick" data-color-scheme="light">
   <script>
-    document.body.dataset.theme = localStorage.getItem('dex-theme') || 'keap';
-    document.body.dataset.colorScheme = localStorage.getItem('dex-color-scheme') || 'system';
+    // Whisker Light is the only supported theme for now. Force-override
+    // any older value left in localStorage from when the theme switcher
+    // exposed Dark / System variants.
+    localStorage.setItem('dex-theme', 'maverick');
+    localStorage.setItem('dex-color-scheme', 'light');
+    document.body.dataset.theme = 'maverick';
+    document.body.dataset.colorScheme = 'light';
   </script>
   <div id="root"></div>
   <script type="module" src="/src/main.ts"></script>
