@@ -37,25 +37,6 @@
             stage within a pipeline.
           </p>
 
-          <div class="tc-info" role="note">
-            <DexIcon name="info" class="tc-info__icon" aria-hidden="true" />
-            <div class="tc-info__body">
-              <p class="tc-info__text">
-                Automations will not be triggered when a deal is created in
-                this stage. To trigger based on a deal's starting stage, select
-                "Deal enters stage" in Easy Automations.
-              </p>
-              <a
-                class="tc-info__link"
-                href="https://learn.thryv.com/hc/en-us/articles/40570771502605-Pipeline-Stage-Moved-Automation"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Learn more
-              </a>
-            </div>
-          </div>
-
           <div class="tc-modal__form">
             <PipelineDropdown
               id="psm-direction"
@@ -87,6 +68,71 @@
               required
               @update:value="onChange('stage', $event)"
             />
+          </div>
+
+          <!-- Info notice sits AFTER the form fields per the trigger
+               spec — it's contextual reading once the user has the
+               dropdowns in view, not a blocker above them. -->
+          <div class="tc-info" role="note">
+            <DexIcon name="info" class="tc-info__icon" aria-hidden="true" />
+            <div class="tc-info__body">
+              <p class="tc-info__text">
+                Automations will not be triggered when a deal is created in
+                this stage. To trigger based on a deal's starting stage, select
+                "Deal enters stage" in Easy Automations.
+              </p>
+              <a
+                class="tc-info__link"
+                href="https://learn.thryv.com/hc/en-us/articles/40570771502605-Pipeline-Stage-Moved-Automation"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Learn more
+              </a>
+            </div>
+          </div>
+        </template>
+
+        <!-- ===========================================================
+             Quote status — single dropdown + info notice. The dropdown
+             uses a distinct DOM shape per the trigger spec
+             (.multiselect.quote-status container with li.menu-item-root
+             items, no numeric ids — data-qa carries the label).
+             =========================================================== -->
+        <template v-else-if="slug === 'quote-status'">
+          <p class="tc-modal__lead">
+            Add or remove a contact from a sequence based on quote status.
+          </p>
+
+          <div class="tc-modal__form">
+            <QuoteStatusDropdown
+              id="qs-status"
+              label="Trigger when quote is"
+              :options="QUOTE_STATUS_OPTIONS"
+              :value="draft.status"
+              placeholder="Select"
+              required
+              @update:value="onChange('status', $event)"
+            />
+          </div>
+
+          <div class="tc-info" role="note">
+            <DexIcon name="info" class="tc-info__icon" aria-hidden="true" />
+            <div class="tc-info__body">
+              <p class="tc-info__text">
+                If a product in a quote matches a product in an existing
+                "Product is purchased" Then, the contact will be added to both
+                automations.
+              </p>
+              <a
+                class="tc-info__link"
+                href="https://learn.thryv.com/hc/en-us/articles/37139908022157-Goals-Quote-Status"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Learn more
+              </a>
+            </div>
           </div>
         </template>
 
@@ -153,6 +199,7 @@ import {
   DexText,
 } from '@thryvlabs/dex-vue';
 import PipelineDropdown from './PipelineDropdown.vue';
+import QuoteStatusDropdown from './QuoteStatusDropdown.vue';
 
 type FieldKind = 'select' | 'text' | 'number';
 type Field = {
@@ -244,7 +291,25 @@ const SCHEMAS: Record<string, Schema> = {
       'Trigger automation when a deal is moved into or out of a particular stage within a pipeline.',
     fields: [],
   },
+  // Quote status — custom layout (single dropdown + info notice).
+  'quote-status': {
+    title: 'Quote status',
+    subtitle:
+      'Add or remove a contact from a sequence based on quote status.',
+    fields: [],
+  },
 };
+
+/** Quote status options. Spec calls for no numeric ids — the value IS
+ *  the label so `data-qa` carries the human string verbatim. */
+const QUOTE_STATUS_OPTIONS = [
+  { value: 'Sent', label: 'Sent' },
+  { value: 'Viewed', label: 'Viewed' },
+  {
+    value: 'Accepted (Payment options unavailable)',
+    label: 'Accepted (Payment options unavailable)',
+  },
+];
 
 const schema = computed<Schema>(
   () =>
@@ -347,8 +412,13 @@ function onPipelineChange(nextPipelineId: string) {
  *  pipeline trigger; other triggers stay always-enabled until each
  *  gets its own validation. */
 const canSave = computed(() => {
-  if (props.slug !== 'pipeline-stage-is-moved') return true;
-  return !!draft.direction && !!draft.pipeline && !!draft.stage;
+  if (props.slug === 'pipeline-stage-is-moved') {
+    return !!draft.direction && !!draft.pipeline && !!draft.stage;
+  }
+  if (props.slug === 'quote-status') {
+    return !!draft.status;
+  }
+  return true;
 });
 
 function onSave() {

@@ -1035,6 +1035,7 @@ const TRIGGER_CONFIG_SLUGS = new Set([
   'product-is-purchased',
   'appointments',
   'pipeline-stage-is-moved',
+  'quote-status',
 ]);
 
 const triggerConfigOpenId = ref<string | null>(null);
