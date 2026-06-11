@@ -1482,14 +1482,19 @@ function openStartingPointPicker(ev: MouseEvent) {
  *  starting-point dropdown. Position matches the legacy
  *  seedStartingPoint default so the rest of the canvas math stays put. */
 function seedFirstNode(payload: { name: string; title: string }) {
-  nodes.value.push({
+  const newNode: BuilderNode = {
     id: uid('n'),
     type: 'trigger',
     title: payload.title,
     name: payload.name,
     x: 80,
     y: 240,
-  });
+  };
+  nodes.value.push(newNode);
+  // Mirror the drag-drop flow: pop the trigger config modal for triggers
+  // that have one (Pipeline / Product / Appointments) so the user can
+  // configure right away without hunting for "View and edit".
+  maybeOpenTriggerConfig(newNode);
 }
 
 // Canvas Sequence Tile tokens (per HANDOFF-CANVAS-SEQUENCE-V1 §10)
