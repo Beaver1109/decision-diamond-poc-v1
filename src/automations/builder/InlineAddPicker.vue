@@ -111,6 +111,11 @@ const props = defineProps<{
    *  Starting-point picker since a diamond can't be the first node — it
    *  always needs an upstream trigger. */
   hideDecisionDiamond?: boolean;
+  /** Center the picker horizontally under the anchor button (so the
+   *  picker's vertical centerline aligns with the button's centerline)
+   *  instead of left-aligning to btn.left. Used by the empty-state
+   *  Starting-point picker for a balanced first-impression look. */
+  centerOnAnchor?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -162,28 +167,33 @@ function applySmartAlignment() {
     : sx;
   const pickerWidth = picker.getBoundingClientRect().width;
 
-  // Default: left-aligned to the + button's left edge.
-  // Flip to right-aligned (so picker.right === btn.right) if doing so
-  // would overflow the canvas wrap's right edge.
   // Default: left-aligned to the + button's left edge so the dropdown
-  // visually descends from the button.
-  let next = props.anchorBtn.left;
+  // visually descends from the button. When `centerOnAnchor` is set
+  // (empty-state Starting-point picker), center the picker under the
+  // button's horizontal midpoint instead.
+  let next: number;
+  if (props.centerOnAnchor) {
+    const btnCenterX = (props.anchorBtn.left + props.anchorBtn.right) / 2;
+    next = btnCenterX - pickerWidth / 2;
+  } else {
+    next = props.anchorBtn.left;
+  }
 
-  // If left-aligned would overflow the wrap's right edge, try the
-  // mirrored placement: right-aligned (so picker.right === btn.right).
+  // If the chosen placement would overflow the wrap's right edge, try
+  // the mirrored placement: right-aligned (so picker.right === btn.right).
   // Only switch if the right-aligned placement *also* doesn't underflow
   // the wrap's left edge — otherwise the picker can't fit either way,
-  // and staying under the button (left-aligned, accepting some
-  // overflow) is less jarring than throwing the picker far to one
-  // side, away from its trigger.
+  // and staying near the button is less jarring than throwing the
+  // picker far to one side, away from its trigger.
   const wouldOverflowRight = next + pickerWidth > boundsRight - 8;
+  const wouldUnderflowLeft = next < boundsLeft + 8;
   if (wouldOverflowRight) {
     const rightAligned = props.anchorBtn.right - pickerWidth;
     if (rightAligned >= boundsLeft + 8) {
       next = rightAligned;
     }
-    // else: both alignments would clip somewhere — stay under the
-    // button to keep the trigger → menu visual association.
+  } else if (wouldUnderflowLeft) {
+    next = boundsLeft + 8;
   }
   placedLeft.value = next;
 }

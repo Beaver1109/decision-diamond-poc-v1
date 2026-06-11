@@ -572,6 +572,7 @@
       :when-items="whenItems"
       :then-items="picker.originId === STARTING_POINT_SENTINEL ? [] : thenItems"
       :hide-decision-diamond="picker.originId === STARTING_POINT_SENTINEL"
+      :center-on-anchor="picker.originId === STARTING_POINT_SENTINEL"
       @pick="onPickIcon"
       @pick-when="onPickWhen"
       @pick-then="onPickThen"
