@@ -108,30 +108,25 @@
 
           <span class="tc-section-heading">When a contact</span>
 
-          <div class="dex-stack dex-gap-0 dex-field">
-            <div
-              class="tc-toggle-group"
-              role="group"
-              aria-label="Appointment event"
-            >
-              <button
+          <div
+            class="tc-toggle-group"
+            role="group"
+            aria-label="Appointment event"
+          >
+            <DexButtonGroup size="default" align-x="left">
+              <DexButton
                 v-for="evt in APPOINTMENT_EVENTS"
                 :key="evt.value"
-                type="button"
-                class="dex-toggle-button dex-button tc-toggle-btn"
+                variant="outline"
+                color="neutral"
+                :selected="appointmentEvent === evt.value"
+                :aria-pressed="appointmentEvent === evt.value"
                 :value="evt.value"
-                :data-state="appointmentEvents.has(evt.value) ? 'on' : 'off'"
-                :data-active="appointmentEvents.has(evt.value) ? '' : undefined"
-                :aria-pressed="appointmentEvents.has(evt.value)"
-                data-variant="outline"
-                data-color="neutral"
-                data-size="default"
-                data-shape="default"
-                @click="toggleAppointmentEvent(evt.value)"
+                @click="selectAppointmentEvent(evt.value)"
               >
                 {{ evt.label }}
-              </button>
-            </div>
+              </DexButton>
+            </DexButtonGroup>
           </div>
 
           <span class="tc-section-heading tc-section-heading--inline">a</span>
@@ -266,6 +261,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import {
   DexButton,
+  DexButtonGroup,
   DexIcon,
   DexIconButton,
   DexText,
@@ -471,31 +467,18 @@ const stageOptions = computed(() => {
 const draft = reactive<Record<string, string>>({ ...props.initialConfig });
 const rootEl = ref<HTMLElement | null>(null);
 
-/** Appointment events selected — stored in `draft.events` as a CSV of
- *  CREATED/UPDATED/DELETED tokens so it round-trips through the
- *  Record<string,string> contract. Set is the editing-time view. */
-const appointmentEvents = ref<Set<string>>(
-  new Set(
-    (props.initialConfig.events ?? 'CREATED')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-  ),
+/** Appointment event — single-select. Clicking an unselected button
+ *  replaces the current selection; clicking the already-selected
+ *  button is a no-op (one event is always selected). Persisted to
+ *  `draft.event` as a single CREATED/UPDATED/DELETED token. */
+const appointmentEvent = ref<string>(
+  props.initialConfig.event || 'CREATED',
 );
 
-function toggleAppointmentEvent(value: string) {
-  const next = new Set(appointmentEvents.value);
-  if (next.has(value)) {
-    next.delete(value);
-  } else {
-    next.add(value);
-  }
-  // Keep at least one event selected so the modal always has a
-  // meaningful trigger — silently ignore the click that would empty
-  // the set.
-  if (next.size === 0) return;
-  appointmentEvents.value = next;
-  draft.events = [...next].join(',');
+function selectAppointmentEvent(value: string) {
+  if (appointmentEvent.value === value) return;
+  appointmentEvent.value = value;
+  draft.event = value;
 }
 
 watch(
@@ -532,15 +515,15 @@ const canSave = computed(() => {
     return !!draft.status;
   }
   if (props.slug === 'appointments') {
-    return appointmentEvents.value.size > 0 && !!draft.appointmentType;
+    return !!appointmentEvent.value && !!draft.appointmentType;
   }
   return true;
 });
 
-// Seed draft.events on first mount for new appointment configs so the
-// Save gate reflects the visible "Schedules" default selection.
-if (props.slug === 'appointments' && !draft.events) {
-  draft.events = [...appointmentEvents.value].join(',');
+// Seed draft.event so the Save gate reflects the visible default
+// (Schedules) on first open.
+if (props.slug === 'appointments' && !draft.event) {
+  draft.event = appointmentEvent.value;
 }
 
 function onSave() {
@@ -652,36 +635,10 @@ function onSave() {
   margin: 12px 0 8px;
 }
 .tc-toggle-group {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.tc-toggle-btn {
-  appearance: none;
-  height: 36px;
-  width: auto;
-  flex: 0 0 auto;
-  padding: 0 16px;
-  border-radius: 8px;
-  border: 1px solid var(--dex-borderColor-default, #d1d5db);
-  background: #fff;
-  color: var(--dex-fgColor-default, #272727);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
-}
-.tc-toggle-btn:hover {
-  border-color: var(--dex-color-blue-400, #60a5fa);
-}
-.tc-toggle-btn[data-state='on'] {
-  background: var(--dex-color-blue-50, #eff6ff);
-  border-color: var(--dex-color-blue-600, #2563eb);
-  color: var(--dex-color-blue-700, #1d4ed8);
-}
-.tc-toggle-btn:focus-visible {
-  outline: 2px solid var(--dex-color-blue-700, #006ceb);
-  outline-offset: 2px;
+  /* DexButtonGroup handles inline layout of its children; this wrapper
+   * exists for the role=group / aria-label hook and any future spacing
+   * tweaks. */
+  display: block;
 }
 .tc-field {
   display: flex;
