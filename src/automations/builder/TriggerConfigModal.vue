@@ -94,6 +94,61 @@
         </template>
 
         <!-- ===========================================================
+             Product is purchased — "When a purchase is made". Three
+             fields with a v-if dependency: Field 2 (Select products)
+             only renders when Field 1 == 'Product'. No info notice.
+             =========================================================== -->
+        <template v-else-if="slug === 'product-is-purchased'">
+          <span class="tc-section-caption">Summary</span>
+          <p class="tc-modal__lead">
+            Add or remove a contact from a sequence based on a purchase
+            they've made.
+          </p>
+
+          <div class="tc-modal__form">
+            <PurchaseTypeDropdown
+              id="prod-purchaseType"
+              label="Select purchase type"
+              :options="PURCHASE_TYPE_OPTIONS"
+              :value="draft.purchaseType"
+              placeholder="Select"
+              @update:value="onPurchaseTypeChange"
+            />
+
+            <!-- v-if (not v-show): the field is removed from the DOM
+                 when "Any purchase" is selected, per spec. -->
+            <SearchableMultiSelect
+              v-if="draft.purchaseType === 'Product'"
+              id="prod-products"
+              label="Select products"
+              :options="productsSearchResults"
+              :value="productsSelected"
+              placeholder="Select"
+              search-placeholder="Search products"
+              empty-message="Start typing to search products"
+              require-query
+              @update:value="onProductsChange"
+              @update:query="(q) => (productsQuery = q)"
+            />
+
+            <span class="tc-static-text">
+              and only run on selected payment types
+            </span>
+
+            <SearchableMultiSelect
+              id="prod-paymentType"
+              label="Payment type"
+              :options="PAYMENT_TYPE_OPTIONS"
+              :value="paymentTypesSelected"
+              placeholder="Select"
+              search-placeholder="Search payment types"
+              empty-message="No matching payment types"
+              @update:value="onPaymentTypesChange"
+            />
+          </div>
+        </template>
+
+        <!-- ===========================================================
              Appointment — sentence-style layout: "When a contact
              [Schedules/Reschedules/Cancels] a [appointment type]".
              Multi-select toggle button group + appointment-type
@@ -269,6 +324,8 @@ import {
 import PipelineDropdown from './PipelineDropdown.vue';
 import QuoteStatusDropdown from './QuoteStatusDropdown.vue';
 import AppointmentTypeDropdown from './AppointmentTypeDropdown.vue';
+import PurchaseTypeDropdown from './PurchaseTypeDropdown.vue';
+import SearchableMultiSelect from './SearchableMultiSelect.vue';
 
 type FieldKind = 'select' | 'text' | 'number';
 type Field = {
@@ -290,34 +347,13 @@ const emit = defineEmits<{
 }>();
 
 const SCHEMAS: Record<string, Schema> = {
+  // Product is purchased — custom layout. Title is the user-facing
+  // "When a purchase is made" (not the slug-ish "Product is purchased").
   'product-is-purchased': {
-    title: 'Product is purchased',
-    subtitle: 'Fire this automation when a contact completes a purchase.',
-    fields: [
-      {
-        id: 'product',
-        label: 'Product',
-        kind: 'select',
-        options: [
-          'Any product',
-          'Annual subscription',
-          'Coaching package',
-          'Starter kit',
-          'Premium add-on',
-        ],
-      },
-      {
-        id: 'paymentType',
-        label: 'Payment type',
-        kind: 'select',
-        options: ['Any', 'One-time', 'Subscription', 'Payment plan'],
-      },
-      {
-        id: 'amount',
-        label: 'Amount (USD)',
-        kind: 'number',
-      },
-    ],
+    title: 'When a purchase is made',
+    subtitle:
+      "Add or remove a contact from a sequence based on a purchase they've made.",
+    fields: [],
   },
   // Appointment uses a custom sentence-style layout
   // ("When a contact [Schedules/Reschedules/Cancels] a [appointment
@@ -366,6 +402,96 @@ const APPOINTMENT_EVENTS = [
   { value: 'UPDATED', label: 'Reschedules' },
   { value: 'DELETED', label: 'Cancels' },
 ];
+
+/** Purchase type — single-select with subtitles per the spec. The
+ *  "Product" branch shows the conditional `Select products` field;
+ *  the "Any purchase" branch hides it via v-if (DOM removed). */
+const PURCHASE_TYPE_OPTIONS = [
+  {
+    value: 'Product',
+    label: 'Product',
+    subtitle: 'When a specific product is purchased',
+  },
+  {
+    value: 'Any purchase',
+    label: 'Any purchase',
+    subtitle: 'When any purchase is made',
+  },
+];
+
+/** Payment types — 8 hardcoded options per spec. Order matters. */
+const PAYMENT_TYPE_OPTIONS = [
+  {
+    value: 'Credit Card (charge now)',
+    label: 'Credit Card (charge now)',
+    subtitle: 'Run when payment type is made by credit card (charge now)',
+  },
+  {
+    value: 'Credit Card (Manual)',
+    label: 'Credit Card (Manual)',
+    subtitle: 'Run when payment type is made by credit card (manual)',
+  },
+  {
+    value: 'Check',
+    label: 'Check',
+    subtitle: 'Run when payment type is made by check',
+  },
+  {
+    value: 'Cash',
+    label: 'Cash',
+    subtitle: 'Run when payment type is made by cash',
+  },
+  {
+    value: 'Money Order',
+    label: 'Money Order',
+    subtitle: 'Run when payment type is made by money order',
+  },
+  {
+    value: 'Adjustment',
+    label: 'Adjustment',
+    subtitle: 'Run when payment type is made by adjustment',
+  },
+  {
+    value: 'Include $0 invoices',
+    label: 'Include $0 invoices',
+    subtitle: 'Run when invoice is $0',
+  },
+  {
+    value: 'Any payment type',
+    label: 'Any payment type',
+    subtitle:
+      'Run on any payment type (Including any future payment types created)',
+  },
+];
+
+/** Products catalogue — in production this would be a live API search
+ *  (no pre-loaded list). The prototype stubs a small catalogue and
+ *  reuses the SearchableMultiSelect's `requireQuery` mode so the list
+ *  stays empty until the user types — mirroring real behaviour. */
+const PRODUCTS_CATALOGUE = [
+  { value: '1 Hour Consult', label: '1 Hour Consult' },
+  { value: '30 min consult', label: '30 min consult' },
+  { value: 'Expensive Product', label: 'Expensive Product' },
+  {
+    value: 'Jialing consultation fee 30/60 mins',
+    label: 'Jialing consultation fee 30/60 mins',
+  },
+  { value: 'Annual subscription', label: 'Annual subscription' },
+  { value: 'Coaching package', label: 'Coaching package' },
+  { value: 'Starter kit', label: 'Starter kit' },
+  { value: 'Premium add-on', label: 'Premium add-on' },
+];
+
+const productsQuery = ref('');
+/** Search-filtered subset of the catalogue. Matches how the real API
+ *  would respond — empty until query is non-empty. */
+const productsSearchResults = computed(() => {
+  const q = productsQuery.value.trim().toLowerCase();
+  if (!q) return [];
+  return PRODUCTS_CATALOGUE.filter((p) =>
+    p.label.toLowerCase().includes(q),
+  );
+});
 
 /** Appointment types — in production this would come from the tenant's
  *  appointment-types API. Stubbed with the live-example fixtures so
@@ -467,6 +593,43 @@ const stageOptions = computed(() => {
 const draft = reactive<Record<string, string>>({ ...props.initialConfig });
 const rootEl = ref<HTMLElement | null>(null);
 
+// -------------------------------------------------------------------
+// Product is purchased — local state. Both multi-select fields are
+// persisted to `draft.products` / `draft.paymentTypes` as comma-joined
+// strings so they fit the Record<string,string> contract; the Set/Array
+// views below are the editing-time projection.
+// -------------------------------------------------------------------
+
+function csvToArr(s: string | undefined): string[] {
+  if (!s) return [];
+  return s.split(',').map((p) => p.trim()).filter(Boolean);
+}
+
+const productsSelected = ref<string[]>(csvToArr(props.initialConfig.products));
+const paymentTypesSelected = ref<string[]>(
+  csvToArr(props.initialConfig.paymentTypes),
+);
+
+function onPurchaseTypeChange(next: string) {
+  draft.purchaseType = next;
+  // "Any purchase" hides the products field per spec — clear any
+  // previously-selected products so they don't silently persist out of
+  // view. If the user flips back to "Product", they start fresh.
+  if (next === 'Any purchase') {
+    productsSelected.value = [];
+    draft.products = '';
+    productsQuery.value = '';
+  }
+}
+function onProductsChange(next: string[]) {
+  productsSelected.value = next;
+  draft.products = next.join(',');
+}
+function onPaymentTypesChange(next: string[]) {
+  paymentTypesSelected.value = next;
+  draft.paymentTypes = next.join(',');
+}
+
 /** Appointment event — single-select. Clicking an unselected button
  *  replaces the current selection; clicking the already-selected
  *  button is a no-op (one event is always selected). Persisted to
@@ -516,6 +679,18 @@ const canSave = computed(() => {
   }
   if (props.slug === 'appointments') {
     return !!appointmentEvent.value && !!draft.appointmentType;
+  }
+  if (props.slug === 'product-is-purchased') {
+    if (!draft.purchaseType) return false;
+    if (paymentTypesSelected.value.length === 0) return false;
+    // Product branch additionally requires at least one product picked.
+    if (
+      draft.purchaseType === 'Product' &&
+      productsSelected.value.length === 0
+    ) {
+      return false;
+    }
+    return true;
   }
   return true;
 });
@@ -633,6 +808,14 @@ function onSave() {
    * appointment-type dropdown — same heading style as "When a contact"
    * but with a smaller top gap so the sentence reads tightly. */
   margin: 12px 0 8px;
+}
+.tc-static-text {
+  /* Sentence-style connector between fields (e.g. "and only run on
+   * selected payment types" between the Products and Payment type
+   * fields). Sits in the form's vertical gap so it reads as inline
+   * copy, not a label. */
+  font-size: 14px;
+  color: var(--dex-fgColor-muted, #6b7280);
 }
 .tc-toggle-group {
   /* DexButtonGroup handles inline layout of its children; this wrapper
