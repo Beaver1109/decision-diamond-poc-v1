@@ -94,6 +94,78 @@
         </template>
 
         <!-- ===========================================================
+             Appointment — sentence-style layout: "When a contact
+             [Schedules/Reschedules/Cancels] a [appointment type]".
+             Multi-select toggle button group + appointment-type
+             dropdown with calendar icons and two-line items.
+             =========================================================== -->
+        <template v-else-if="slug === 'appointments'">
+          <span class="tc-section-caption">Summary</span>
+          <p class="tc-modal__lead">
+            Add or remove a contact from a sequence when an appointment is
+            scheduled, rescheduled, or canceled.
+          </p>
+
+          <span class="tc-section-heading">When a contact</span>
+
+          <div class="dex-stack dex-gap-0 dex-field">
+            <div
+              class="tc-toggle-group"
+              role="group"
+              aria-label="Appointment event"
+            >
+              <button
+                v-for="evt in APPOINTMENT_EVENTS"
+                :key="evt.value"
+                type="button"
+                class="dex-toggle-button dex-button tc-toggle-btn"
+                :value="evt.value"
+                :data-state="appointmentEvents.has(evt.value) ? 'on' : 'off'"
+                :data-active="appointmentEvents.has(evt.value) ? '' : undefined"
+                :aria-pressed="appointmentEvents.has(evt.value)"
+                data-variant="outline"
+                data-color="neutral"
+                data-size="default"
+                data-shape="default"
+                @click="toggleAppointmentEvent(evt.value)"
+              >
+                {{ evt.label }}
+              </button>
+            </div>
+          </div>
+
+          <span class="tc-section-heading tc-section-heading--inline">a</span>
+
+          <div class="tc-modal__form">
+            <AppointmentTypeDropdown
+              id="appt-type"
+              :options="APPOINTMENT_TYPES"
+              :value="draft.appointmentType"
+              placeholder="Select an appointment type"
+              required
+              @update:value="onChange('appointmentType', $event)"
+            />
+          </div>
+
+          <div class="tc-info" role="note">
+            <DexIcon name="info" class="tc-info__icon" aria-hidden="true" />
+            <div class="tc-info__body">
+              <p class="tc-info__text">
+                You can use this goal to both start and stop an automation.
+              </p>
+              <a
+                class="tc-info__link"
+                href="https://learn.thryv.com/hc/en-us/articles/37146000596493-Goals-Appointments"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Learn more
+              </a>
+            </div>
+          </div>
+        </template>
+
+        <!-- ===========================================================
              Quote status — single dropdown + info notice. The dropdown
              uses a distinct DOM shape per the trigger spec
              (.multiselect.quote-status container with li.menu-item-root
@@ -200,6 +272,7 @@ import {
 } from '@thryvlabs/dex-vue';
 import PipelineDropdown from './PipelineDropdown.vue';
 import QuoteStatusDropdown from './QuoteStatusDropdown.vue';
+import AppointmentTypeDropdown from './AppointmentTypeDropdown.vue';
 
 type FieldKind = 'select' | 'text' | 'number';
 type Field = {
@@ -250,37 +323,15 @@ const SCHEMAS: Record<string, Schema> = {
       },
     ],
   },
+  // Appointment uses a custom sentence-style layout
+  // ("When a contact [Schedules/Reschedules/Cancels] a [appointment
+  // type]") so its schema fields are empty — the markup lives inline
+  // in the template branch.
   appointments: {
-    title: 'Appointments',
+    title: 'Appointment',
     subtitle:
-      'Fire this automation when an appointment matches the conditions below.',
-    fields: [
-      {
-        id: 'condition',
-        label: 'When',
-        kind: 'select',
-        options: [
-          'Is scheduled',
-          'Is completed',
-          'Is cancelled',
-          'Is rescheduled',
-          'Is a no-show',
-        ],
-      },
-      {
-        id: 'appointmentType',
-        label: 'Appointment type',
-        kind: 'select',
-        options: [
-          'Any type',
-          'Maintenance tune-up',
-          'Repair',
-          'Install',
-          'Estimate',
-          'Consultation',
-        ],
-      },
-    ],
+      'Add or remove a contact from a sequence when an appointment is scheduled, rescheduled, or canceled.',
+    fields: [],
   },
   // Pipeline stage moved has a custom layout (info box + dependent
   // dropdowns) — the generic schema below only feeds the modal's title
@@ -308,6 +359,41 @@ const QUOTE_STATUS_OPTIONS = [
   {
     value: 'Accepted (Payment options unavailable)',
     label: 'Accepted (Payment options unavailable)',
+  },
+];
+
+/** Appointment event toggle group. The underlying API values
+ *  (CREATED/UPDATED/DELETED) are what the trigger config persists; the
+ *  labels are what the user sees. */
+const APPOINTMENT_EVENTS = [
+  { value: 'CREATED', label: 'Schedules' },
+  { value: 'UPDATED', label: 'Reschedules' },
+  { value: 'DELETED', label: 'Cancels' },
+];
+
+/** Appointment types — in production this would come from the tenant's
+ *  appointment-types API. Stubbed with the live-example fixtures so
+ *  QA can target rows by data-qa exactly as in the spec. */
+const APPOINTMENT_TYPES = [
+  {
+    value: 'teste34345 with Selenium Automation',
+    label: 'teste34345 with Selenium Automation',
+    subtitle: '15 minutes',
+  },
+  {
+    value: 'test4645 with Selenium Automation',
+    label: 'test4645 with Selenium Automation',
+    subtitle: '30 minutes',
+  },
+  {
+    value: 'test3534523 with Selenium Automation',
+    label: 'test3534523 with Selenium Automation',
+    subtitle: '15 minutes',
+  },
+  {
+    value: 'test353343 with Selenium Automation',
+    label: 'test353343 with Selenium Automation',
+    subtitle: '15 minutes',
   },
 ];
 
@@ -385,6 +471,33 @@ const stageOptions = computed(() => {
 const draft = reactive<Record<string, string>>({ ...props.initialConfig });
 const rootEl = ref<HTMLElement | null>(null);
 
+/** Appointment events selected — stored in `draft.events` as a CSV of
+ *  CREATED/UPDATED/DELETED tokens so it round-trips through the
+ *  Record<string,string> contract. Set is the editing-time view. */
+const appointmentEvents = ref<Set<string>>(
+  new Set(
+    (props.initialConfig.events ?? 'CREATED')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  ),
+);
+
+function toggleAppointmentEvent(value: string) {
+  const next = new Set(appointmentEvents.value);
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
+  // Keep at least one event selected so the modal always has a
+  // meaningful trigger — silently ignore the click that would empty
+  // the set.
+  if (next.size === 0) return;
+  appointmentEvents.value = next;
+  draft.events = [...next].join(',');
+}
+
 watch(
   () => props.initialConfig,
   (next) => {
@@ -418,8 +531,17 @@ const canSave = computed(() => {
   if (props.slug === 'quote-status') {
     return !!draft.status;
   }
+  if (props.slug === 'appointments') {
+    return appointmentEvents.value.size > 0 && !!draft.appointmentType;
+  }
   return true;
 });
+
+// Seed draft.events on first mount for new appointment configs so the
+// Save gate reflects the visible "Schedules" default selection.
+if (props.slug === 'appointments' && !draft.events) {
+  draft.events = [...appointmentEvents.value].join(',');
+}
 
 function onSave() {
   if (!canSave.value) return;
@@ -472,7 +594,10 @@ function onSave() {
   border: 1px solid var(--dex-color-blue-200, #bfdbfe);
   border-radius: 8px;
   padding: 12px 14px;
-  margin: 0 0 18px;
+  /* Sit below the last form field with a clear breathing margin so it
+   * reads as a separate contextual note, not a fourth field. Matches
+   * the gap shown in the production Appointment screen. */
+  margin: 24px 0 0;
 }
 .tc-info__icon {
   color: var(--dex-color-blue-700, #1d4ed8);
@@ -503,6 +628,60 @@ function onSave() {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+.tc-section-caption {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dex-fgColor-muted, #6b7280);
+  margin-bottom: 4px;
+}
+.tc-section-heading {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--dex-fgColor-default, #272727);
+  margin: 18px 0 8px;
+}
+.tc-section-heading--inline {
+  /* The lowercase "a" connector between the toggle group and the
+   * appointment-type dropdown — same heading style as "When a contact"
+   * but with a smaller top gap so the sentence reads tightly. */
+  margin: 12px 0 8px;
+}
+.tc-toggle-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tc-toggle-btn {
+  appearance: none;
+  height: 36px;
+  width: auto;
+  flex: 0 0 auto;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--dex-borderColor-default, #d1d5db);
+  background: #fff;
+  color: var(--dex-fgColor-default, #272727);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.tc-toggle-btn:hover {
+  border-color: var(--dex-color-blue-400, #60a5fa);
+}
+.tc-toggle-btn[data-state='on'] {
+  background: var(--dex-color-blue-50, #eff6ff);
+  border-color: var(--dex-color-blue-600, #2563eb);
+  color: var(--dex-color-blue-700, #1d4ed8);
+}
+.tc-toggle-btn:focus-visible {
+  outline: 2px solid var(--dex-color-blue-700, #006ceb);
+  outline-offset: 2px;
 }
 .tc-field {
   display: flex;
